@@ -1,0 +1,25 @@
+# Docker configuration for dashboard development
+# Local development server for Chart.js dashboard
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY dashboard/package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy dashboard source
+COPY dashboard/ .
+
+# Expose port for development
+EXPOSE 3000
+
+# Development server (with hot-reload if using build tools)
+CMD ["npm", "start"]
+
+LABEL maintainer="TechWithHer"
+LABEL version="2.0.0"
+LABEL description="Dashboard Development Server"

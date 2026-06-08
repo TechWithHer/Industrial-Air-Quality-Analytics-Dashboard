@@ -1,0 +1,126 @@
+# Docker Compose for complete local development environment
+# Simulates AWS services using LocalStack + runs integration tests
+
+version: '3.8'
+
+services:
+  # LocalStack: Local AWS API emulator
+  localstack:
+    image: localstack/localstack:latest
+    container_name: air-quality-localstack
+    ports:
+      - "4566:4566"  # LocalStack gateway
+      - "4571:4571"  # S3
+    environment:
+      SERVICES: s3,lambda,events,sns,sqs,athena,glue,dynamodb,logs
+      DEBUG: 1
+      DATA_DIR: /tmp/localstack/data
+      LAMBDA_EXECUTOR: docker
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - "${PWD}/localstack:/tmp/localstack"  # Persist LocalStack data
+      - "/var/run/docker.sock:/var/run/docker.sock"  # Docker socket
+    networks:
+      - air-quality-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # S3 LocalStack bucket initialization
+  s3-setup:
+    image: amazon/aws-cli:latest
+    container_name: air-quality-s3-setup
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      AWS_DEFAULT_REGION: ap-southeast-1
+    command: >
+      s3 mb s3://air-quality-raw --endpoint-url http://localstack:4566
+      && s3 mb s3://air-quality-processed --endpoint-url http://localstack:4566
+      && s3 mb s3://air-quality-athena-results --endpoint-url http://localstack:4566
+    networks:
+      - air-quality-network
+
+  # Lambda local testing
+  lambda-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.lambda
+    container_name: air-quality-lambda-test
+    depends_on:
+      - localstack
+    environment:
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      AWS_DEFAULT_REGION: ap-southeast-1
+      AWS_ENDPOINT_URL: http://localstack:4566
+      S3_RAW_BUCKET: air-quality-raw
+      S3_PROCESSED_BUCKET: air-quality-processed
+      NEA_PSI_API: https://api.data.gov.sg/v1/environment/psi
+      NEA_PM25_API: https://api.data.gov.sg/v1/environment/pm25
+      NEA_TEMP_API: https://api.data.gov.sg/v1/environment/air-temperature
+    ports:
+      - "9001:8080"  # Lambda runtime port
+    networks:
+      - air-quality-network
+    volumes:
+      - "${PWD}/lambdas:/var/task/lambdas:ro"
+    profiles:
+      - lambda  # Run with: docker-compose --profile lambda up
+
+  # Integration tests
+  integration-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: air-quality-tests
+    depends_on:
+      - localstack
+      - s3-setup
+    environment:
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      AWS_DEFAULT_REGION: ap-southeast-1
+      AWS_ENDPOINT_URL: http://localstack:4566
+      S3_RAW_BUCKET: air-quality-raw
+      S3_PROCESSED_BUCKET: air-quality-processed
+      PYTHONUNBUFFERED: 1
+    networks:
+      - air-quality-network
+    volumes:
+      - "${PWD}:/app"
+    profiles:
+      - test  # Run with: docker-compose --profile test up
+
+  # Dashboard development server
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: air-quality-dashboard-dev
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:9000
+      REACT_APP_REGION: ap-southeast-1
+    volumes:
+      - "${PWD}/dashboard:/app"
+      - "/app/node_modules"
+    networks:
+      - air-quality-network
+    profiles:
+      - dashboard  # Run with: docker-compose --profile dashboard up
+    command: npm start
+
+networks:
+  air-quality-network:
+    driver: bridge
+
+volumes:
+  localstack:
+    driver: local

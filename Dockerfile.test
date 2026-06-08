@@ -1,0 +1,39 @@
+# Docker configuration for local integration testing
+# Uses LocalStack to simulate AWS services locally
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+COPY tests/requirements.txt ./tests/requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r tests/requirements.txt
+
+# Copy entire project
+COPY . .
+
+# Set environment variables for testing
+ENV PYTHONUNBUFFERED=1
+ENV AWS_ACCESS_KEY_ID=testing
+ENV AWS_SECRET_ACCESS_KEY=testing
+ENV AWS_SECURITY_TOKEN=testing
+ENV AWS_SESSION_TOKEN=testing
+ENV AWS_REGION=ap-southeast-1
+ENV AWS_ENDPOINT_URL=http://localstack:4566
+
+# Run tests by default
+CMD ["pytest", "tests/integration", "-v", "--tb=short"]
+
+LABEL maintainer="TechWithHer"
+LABEL version="2.0.0"
+LABEL description="Integration Tests with LocalStack"
