@@ -1,0 +1,9 @@
+# Tests requirements - for pytest and integration testing
+
+pytest==7.4.0
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1
+moto==4.1.14
+boto3-stubs==1.28.85
+faker==19.2.0
+python-dotenv==1.0.0

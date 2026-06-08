@@ -1,0 +1,25 @@
+# Docker configuration for Lambda local testing
+# Allows testing Lambda functions locally before deployment to AWS
+
+FROM public.ecr.aws/lambda/python:3.11
+
+# Set working directory
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Copy requirements
+COPY lambdas/ingestion/nea_ingestion/requirements.txt .
+
+# Install Python dependencies
+RUN pip install -r requirements.txt
+
+# Copy Lambda handler code
+COPY lambdas/ingestion/nea_ingestion/handler.py .
+COPY lambdas/shared/ ${LAMBDA_TASK_ROOT}/shared/
+
+# Set the CMD to your handler
+CMD [ "handler.lambda_handler" ]
+
+# Labels for identification
+LABEL maintainer="TechWithHer"
+LABEL version="2.0.0"
+LABEL description="NEA Data Ingestion Lambda"
