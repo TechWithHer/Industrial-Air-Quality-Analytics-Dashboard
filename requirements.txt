@@ -1,0 +1,14 @@
+boto3==1.28.85
+boto3-stubs==1.28.85
+requests==2.31.0
+python-dotenv==1.0.0
+aws-lambda-powertools==2.20.0
+pytest==7.4.0
+pytest-cov==4.1.0
+moto==4.1.14
+black==23.7.0
+flake8==6.0.0
+pylint==2.17.5
+terraform==1.5.0
+trivy==0.45.0
+checkov==1.1.250
